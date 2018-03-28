@@ -8,7 +8,7 @@ import dateutil.parser
 
 import numpy as np
 
-from .events import _read_events, _combine_triggers
+from .events import _read_events, _combine_triggers, _get_epochs
 from .general import (_get_signalfname, _get_ep_info, _extract, _get_blocks,
                       _get_gains, _block_r)
 from ..base import BaseRaw, _check_update_montage
@@ -275,6 +275,10 @@ class RawMff(BaseRaw):
         if misc is None:
             misc = np.where(np.array(
                 egi_info['chan_type']) != 'eeg')[0].tolist()
+                
+        epoch_data = _get_epochs(input_fname)
+        
+        logger.info(epoch_data)
 
         logger.info('    Reading events ...')
         egi_events, egi_info = _read_events(input_fname, egi_info)

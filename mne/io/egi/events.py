@@ -11,6 +11,30 @@ import numpy as np
 
 from ...utils import logger
 
+def _get_epochs(filename):
+    """Extract Epoch time data boundaries
+    
+    Parameters
+    ----------
+    filename : str
+        File path
+    """
+    epochs = []
+    #How do elegantly?
+    xml_epochs = _parse_xml(join(filename,'epochs.xml'))
+    logger.info(xml_epochs)
+    for epoch in xml_epochs:
+        tmpEp = {'beginTime':int(epoch['beginTime']),
+                 'endTime': int(epoch['endTime']),
+                 'firstBlock': int(epoch['firstBlock']),
+                 'lastBlock': int(epoch['lastBlock']),
+                }
+        if(not epochs):
+            tmpEp['epochGap']=0
+        else:
+            tmpEp['epochGap']=tmpEp.get('beginTime')-epochs[-1].get('endTime')
+        epochs.append(tmpEp)
+    return epochs
 
 def _read_events(input_fname, info):
     """Read events for the record.
