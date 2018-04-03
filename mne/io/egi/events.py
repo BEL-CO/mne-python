@@ -22,21 +22,49 @@ def _get_epochs(filename):
     epochs = []
     #How do elegantly?
     xml_epochs = _parse_xml(join(filename,'epochs.xml'))
-    logger.info(xml_epochs)
     for epoch in xml_epochs:
-        tmpEp = {'beginTime':int(epoch['beginTime']),
-                 'endTime': int(epoch['endTime']),
+        #The division by 1000 converts from micro to seconds
+        #This is because the timedelta objects used only have access to seconds
+        tmpEp = {'beginTime':int(epoch['beginTime'])/1000,
+                 'endTime': int(epoch['endTime'])/1000,
                  'firstBlock': int(epoch['firstBlock']),
                  'lastBlock': int(epoch['lastBlock']),
                 }
+        logger.info(tmpEp)
         if(not epochs):
             tmpEp['epochGap']=0
         else:
             tmpEp['epochGap']=tmpEp.get('beginTime')-epochs[-1].get('endTime')
+        
         epochs.append(tmpEp)
+    
     return epochs
+    
+def _get_epoch_corr(evtOnset,epochs):
+    """Determines number of seconds to correct for based on breaks between epochs
+    
+    Parameters
+    ----------
+    evtOnset: long
+        Onset of Event in Seconds
+    epochs: dict
+        Dictionary of Epochs
+    """
+    correction = 0
+    logger.info("Start of correction loop.")
+    for epoch in epochs:
+        logger.info(epoch)
+        logger.info("Event Onset Time: %s", evtOnset)
+        logger.info("Epoch Begin Time: %s", epoch.get('beginTime'))
+        logger.info("Epoch End Time: %s", epoch.get('endTime'))
+        
+        if(not(evtOnset > epoch.get('beginTime') and evtOnset < epoch.get('endTime'))):
+            correction = correction + epoch.get('epochGap')
+        else:
+            logger.info("Return to calling method")
+            return correction
 
-def _read_events(input_fname, info):
+def _read_events(input_fname, info, epochs):
     """Read events for the record.
 
     Parameters
@@ -45,8 +73,10 @@ def _read_events(input_fname, info):
         The file path.
     info : dict
         Header info array.
+    epochs : dict
+        Epoch info dictionary
     """
-    mff_events, event_codes = _read_mff_events(input_fname, info['sfreq'])
+    mff_events, event_codes = _read_mff_events(input_fname, info['sfreq'], epochs)
     info['n_events'] = len(event_codes)
     info['event_codes'] = np.asarray(event_codes).astype('<U4')
     events = np.zeros([info['n_events'],
@@ -57,7 +87,7 @@ def _read_events(input_fname, info):
     return events, info
 
 
-def _read_mff_events(filename, sfreq):
+def _read_mff_events(filename, sfreq, epochs):
     """Extract the events.
 
     Parameters
@@ -66,8 +96,11 @@ def _read_mff_events(filename, sfreq):
         File path.
     sfreq : float
         The sampling frequency
+    epochs : dict
+        Epoch info dictionary=
     """
     orig = {}
+    
     for xml_file in glob(join(filename, '*.xml')):
         xml_type = splitext(basename(xml_file))[0]
         orig[xml_type] = _parse_xml(xml_file)
@@ -82,7 +115,14 @@ def _read_mff_events(filename, sfreq):
     for xml in xml_events:
         for event in orig[xml][2:]:
             event_start = _ns2py_time(event['beginTime'])
+            #logger.info("Uncorrected Event time: %s", event_start)
             start = (event_start - start_time).total_seconds()
+            #logger.info("Corrected Event time: %s",start * 1000)
+            #Upconvert to Milliseconds from Seconds to interface  
+            epoch_corr = _get_epoch_corr(start*1000,epochs)
+            logger.info("Uncorrected Event Time is: %s", start)
+            logger.info("Epoch Corrected Event Time is: %s",(start - epoch_corr))
+            start = start - epoch_corr
             if event['code'] not in code:
                 code.append(event['code'])
             marker = {'name': event['code'],

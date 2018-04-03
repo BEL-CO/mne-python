@@ -278,10 +278,10 @@ class RawMff(BaseRaw):
                 
         epoch_data = _get_epochs(input_fname)
         
-        logger.info(epoch_data)
+        #logger.info(epoch_data)
 
         logger.info('    Reading events ...')
-        egi_events, egi_info = _read_events(input_fname, egi_info)
+        egi_events, egi_info = _read_events(input_fname, egi_info, epoch_data)
         gains = _get_gains(op.join(input_fname, egi_info['info_fname']))
         if egi_info['value_range'] != 0 and egi_info['bits'] != 0:
             cals = [egi_info['value_range'] / 2 ** egi_info['bits'] for i
